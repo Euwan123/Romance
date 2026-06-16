@@ -1,0 +1,16 @@
+npm install
+npm run dev
+
+Build for production (runs prebuild + lint + build)
+--------------------------------------------------
+npm run build
+
+Start production server (after build)
+--------------------------------------------------
+npm run start
+
+Vercel deployment (optional)
+--------------------------------------------------
+npm i -g vercel
+vercel
+vercel --prod
