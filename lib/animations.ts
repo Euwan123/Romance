@@ -1,4 +1,6 @@
-export const fadeUp = {
+import type { Variants } from "framer-motion";
+
+export const fadeUp: Variants = {
   hidden: { opacity: 0, y: 32 },
   visible: {
     opacity: 1,
@@ -7,7 +9,7 @@ export const fadeUp = {
   }
 };
 
-export const staggerContainer = {
+export const staggerContainer: Variants = {
   hidden: {},
   visible: {
     transition: {
@@ -17,7 +19,7 @@ export const staggerContainer = {
   }
 };
 
-export const springPop = {
+export const springPop: Variants = {
   hidden: { opacity: 0, scale: 0.8 },
   visible: {
     opacity: 1,

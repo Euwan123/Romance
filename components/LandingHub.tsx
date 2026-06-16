@@ -2,9 +2,10 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { BookHeart, Camera, ChevronRight, Lock, NotebookPen, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { HiddenLetter } from "@/components/HiddenLetter";
 import { HeroHeart } from "@/components/HeroHeart";
+import { notifySession, subscribeSession } from "@/lib/sessionStore";
 
 type LandingHubProps = {
   onSelect: (mode: "book" | "gallery" | "diary") => void;
@@ -75,12 +76,14 @@ function FrameDecor({ frame }: { frame: string }) {
 }
 
 export function LandingHub({ onSelect }: LandingHubProps) {
-  const [kissed, setKissed] = useState(false);
   const [kissModalOpen, setKissModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (sessionStorage.getItem("euwan_kissed") === "1") setKissed(true);
-  }, []);
+  const [kissedNow, setKissedNow] = useState(false);
+  const kissedStored = useSyncExternalStore(
+    subscribeSession,
+    () => sessionStorage.getItem("euwan_kissed") === "1",
+    () => false
+  );
+  const kissed = kissedStored || kissedNow;
 
   const handleOptionClick = (id: "book" | "gallery" | "diary") => {
     if (id === "diary" && !kissed) {
@@ -100,7 +103,13 @@ export function LandingHub({ onSelect }: LandingHubProps) {
         transition={{ duration: 0.7 }}
         className="mb-6 text-center"
       >
-        <HeroHeart onKiss={() => setKissed(true)} />
+        <HeroHeart
+          onKiss={() => {
+            sessionStorage.setItem("euwan_kissed", "1");
+            setKissedNow(true);
+            notifySession();
+          }}
+        />
         <h1 className="text-3xl font-semibold rose-gradient-text">Our Journey Together ❤️</h1>
         <p className="mt-3 px-2 text-sm leading-relaxed text-white/80">
           A collection of memories, milestones, and moments that shaped our story ❤️

@@ -1,7 +1,7 @@
 npm install
 npm run dev
 
-Build for production (runs prebuild + lint + build)
+Build for production (runs prebuild + build)
 --------------------------------------------------
 npm run build
 
@@ -9,8 +9,10 @@ Start production server (after build)
 --------------------------------------------------
 npm run start
 
-Vercel deployment (optional)
+Deploy to Vercel
 --------------------------------------------------
-npm i -g vercel
-vercel
-vercel --prod
+1. Push to GitHub branch: main
+2. Import Euwan123/Romance in Vercel
+3. Framework: Next.js | Root Directory: ./
+4. Build Command: npm run build | Install: npm install
+5. Set Production Branch to main (not clean-main)

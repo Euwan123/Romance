@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { Heart, X } from "lucide-react";
 import { useState } from "react";
+import { notifySession } from "@/lib/sessionStore";
 
 const sparkles = [
   { id: 0, x: -42, y: -28, delay: 0 },
@@ -78,6 +79,7 @@ export function HeroHeart({ onKiss }: { onKiss?: () => void }) {
         onClick={() => {
           sessionStorage.setItem("euwan_kissed", "1");
           onKiss?.();
+          notifySession();
           setOpen(true);
         }}
       >

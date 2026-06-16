@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { storyPages } from "@/data/storybook";
 import { PolaroidFrame } from "@/components/PolaroidFrame";
@@ -16,7 +16,6 @@ export function StoryBook({ onBack }: StoryBookProps) {
   const [direction, setDirection] = useState<1 | -1>(1);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  const imageCounter = useRef(0);
 
   const page = storyPages[activeIndex];
 
@@ -37,22 +36,38 @@ export function StoryBook({ onBack }: StoryBookProps) {
     goTo(activeIndex - 1);
   };
 
-  const renderImage = (src: string, alt: string, priority?: boolean) => {
-    const idx = imageCounter.current;
-    const showEntrance = !entranceShown;
-    if (showEntrance) entranceShown = true;
-    imageCounter.current += 1;
-    return (
-      <PolaroidFrame
-        key={`${page.id}-${src}`}
-        src={src}
-        alt={alt}
-        index={idx}
-        priority={priority}
-        showEntrance={showEntrance}
-      />
-    );
-  };
+  const pageBlocks = useMemo(() => {
+    let imageIndex = 0;
+    let canShowEntrance = !entranceShown;
+
+    return page.blocks.map((block) => {
+      if (block.type === "image") {
+        const showEntrance = canShowEntrance;
+        if (canShowEntrance) {
+          canShowEntrance = false;
+          entranceShown = true;
+        }
+        const idx = imageIndex;
+        imageIndex += 1;
+        return (
+          <PolaroidFrame
+            key={`${page.id}-${block.src}`}
+            src={block.src}
+            alt={block.alt}
+            index={idx}
+            priority={activeIndex === 0 && page.page === 1 && idx === 0}
+            showEntrance={showEntrance}
+          />
+        );
+      }
+
+      return (
+        <p key={block.content} className="px-1 text-[15px] leading-relaxed text-[#4a3540]">
+          {block.content}
+        </p>
+      );
+    });
+  }, [activeIndex, page]);
 
   return (
     <section className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-8 pt-6">
@@ -104,18 +119,7 @@ export function StoryBook({ onBack }: StoryBookProps) {
                 {page.heading}
               </h2>
 
-              <div className="space-y-4">
-                {page.blocks.map((block) => {
-                  if (block.type === "image") {
-                    return renderImage(block.src, block.alt, activeIndex === 0 && page.page === 1);
-                  }
-                  return (
-                    <p key={block.content} className="px-1 text-[15px] leading-relaxed text-[#4a3540]">
-                      {block.content}
-                    </p>
-                  );
-                })}
-              </div>
+              <div className="space-y-4">{pageBlocks}</div>
             </div>
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs tracking-[0.25em] text-[#8b6b7a]">
               {page.page}

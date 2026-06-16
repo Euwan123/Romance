@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { LockedScreen } from "@/components/LockedScreen";
 import { LoginScreen } from "@/components/LoginScreen";
+import { notifySession, subscribeSession } from "@/lib/sessionStore";
 
 const RomanceExperience = dynamic(async () => {
   const mod = await import("@/components/RomanceExperience");
@@ -31,14 +32,36 @@ async function sha256Hex(text: string) {
   return hex;
 }
 
+function readSessionAuth() {
+  return sessionStorage.getItem("journey_auth_ok") === "1";
+}
+
+function readSessionLockedUntil() {
+  const lockedUntilStr = sessionStorage.getItem("journey_locked_until");
+  const lockedUntilNum = lockedUntilStr ? Number(lockedUntilStr) : null;
+  if (!lockedUntilNum || Number.isNaN(lockedUntilNum)) return null;
+  return Date.now() < lockedUntilNum ? lockedUntilNum : null;
+}
+
+function readSessionAttempts() {
+  const attemptsStr = sessionStorage.getItem("journey_attempts_left");
+  const parsedAttempts = attemptsStr ? Number(attemptsStr) : ATTEMPTS_MAX;
+  return Number.isNaN(parsedAttempts) ? ATTEMPTS_MAX : parsedAttempts;
+}
+
 export default function Home() {
-  const [authed, setAuthed] = useState(false);
-  const [attemptsLeft, setAttemptsLeft] = useState(ATTEMPTS_MAX);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const sessionAuthed = useSyncExternalStore(subscribeSession, readSessionAuth, () => false);
+  const sessionLockedUntil = useSyncExternalStore(subscribeSession, readSessionLockedUntil, () => null);
+  const sessionAttempts = useSyncExternalStore(subscribeSession, readSessionAttempts, () => ATTEMPTS_MAX);
+  const [lockOverride, setLockOverride] = useState<number | null | undefined>(undefined);
+  const [attemptOverride, setAttemptOverride] = useState<number | undefined>(undefined);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [pendingLock, setPendingLock] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+
+  const lockedUntil = lockOverride !== undefined ? lockOverride : sessionLockedUntil;
+  const attemptsLeft = attemptOverride ?? sessionAttempts;
 
   const locked = useMemo(() => {
     if (!lockedUntil) return false;
@@ -51,34 +74,16 @@ export default function Home() {
   }, [lockedUntil, now]);
 
   useEffect(() => {
-    const ok = sessionStorage.getItem("journey_auth_ok") === "1";
-    if (ok) {
-      setAuthed(true);
-      return;
-    }
-
-    const lockedUntilStr = sessionStorage.getItem("journey_locked_until");
-    const attemptsStr = sessionStorage.getItem("journey_attempts_left");
-
-    const lockedUntilNum = lockedUntilStr ? Number(lockedUntilStr) : null;
-    if (lockedUntilNum && Date.now() < lockedUntilNum) {
-      setLockedUntil(lockedUntilNum);
-    }
-
-    const parsedAttempts = attemptsStr ? Number(attemptsStr) : ATTEMPTS_MAX;
-    if (!Number.isNaN(parsedAttempts)) setAttemptsLeft(parsedAttempts);
-  }, []);
-
-  useEffect(() => {
     if (!lockedUntil) return;
     const tick = () => {
       const current = Date.now();
       setNow(current);
       if (current >= lockedUntil) {
         sessionStorage.removeItem("journey_locked_until");
-        setLockedUntil(null);
-        setAttemptsLeft(ATTEMPTS_MAX);
         sessionStorage.setItem("journey_attempts_left", String(ATTEMPTS_MAX));
+        setLockOverride(null);
+        setAttemptOverride(undefined);
+        notifySession();
       }
     };
     tick();
@@ -86,31 +91,28 @@ export default function Home() {
     return () => clearInterval(id);
   }, [lockedUntil]);
 
-  useEffect(() => {
-    if (!locked) return;
-    setAuthed(false);
-  }, [locked]);
-
   const submitPassword = async (password: string) => {
-    if (authed || locked) return;
+    if (sessionAuthed || locked) return;
     if (errorOpen) return;
     if (password.length !== 4) return;
 
     const hash = await sha256Hex(password);
     if (hash === PASSWORD_HASH) {
       sessionStorage.setItem("journey_auth_ok", "1");
-      setAuthed(true);
-      setErrorOpen(false);
-      setPendingLock(false);
-      setAttemptsLeft(ATTEMPTS_MAX);
       sessionStorage.setItem("journey_attempts_left", String(ATTEMPTS_MAX));
       sessionStorage.removeItem("journey_locked_until");
+      setErrorOpen(false);
+      setPendingLock(false);
+      setAttemptOverride(undefined);
+      setLockOverride(null);
+      notifySession();
       return;
     }
 
     const nextAttempts = Math.max(0, attemptsLeft - 1);
-    setAttemptsLeft(nextAttempts);
+    setAttemptOverride(nextAttempts);
     sessionStorage.setItem("journey_attempts_left", String(nextAttempts));
+    notifySession();
 
     const msg = ERROR_MESSAGES[Math.floor(Math.random() * ERROR_MESSAGES.length)];
     setErrorMessage(msg);
@@ -123,12 +125,13 @@ export default function Home() {
     if (!pendingLock) return;
     const until = Date.now() + COOLDOWN_MS;
     sessionStorage.setItem("journey_locked_until", String(until));
-    setLockedUntil(until);
+    setLockOverride(until);
     setPendingLock(false);
+    notifySession();
   };
 
-  if (authed) return <RomanceExperience />;
   if (locked) return <LockedScreen secondsLeft={cooldownSecondsLeft} />;
+  if (sessionAuthed) return <RomanceExperience />;
 
   return (
     <LoginScreen
